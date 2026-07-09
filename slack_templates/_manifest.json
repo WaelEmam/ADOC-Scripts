@@ -1,0 +1,100 @@
+[
+  {
+    "channel": "slack",
+    "file": "cadence_policy.json",
+    "sourceType": "cadence_policy",
+    "templateGroupId": "38",
+    "templateId": "167"
+  },
+  {
+    "channel": "slack",
+    "file": "crawler.json",
+    "sourceType": "crawler",
+    "templateGroupId": "38",
+    "templateId": "175"
+  },
+  {
+    "channel": "slack",
+    "file": "data_drift.json",
+    "sourceType": "data_drift",
+    "templateGroupId": "38",
+    "templateId": "165"
+  },
+  {
+    "channel": "slack",
+    "file": "data_quality.json",
+    "sourceType": "data_quality",
+    "templateGroupId": "38",
+    "templateId": "163"
+  },
+  {
+    "channel": "slack",
+    "file": "pipeline_execution_failure.json",
+    "sourceType": "pipeline_execution_failure",
+    "templateGroupId": "38",
+    "templateId": "170"
+  },
+  {
+    "channel": "slack",
+    "file": "pipeline_monitoring_policy_event_metadata_event_metric.json",
+    "sourceType": "pipeline_monitoring_policy_event_metadata_event_metric",
+    "templateGroupId": "38",
+    "templateId": "172"
+  },
+  {
+    "channel": "slack",
+    "file": "pipeline_monitoring_policy_time_duration.json",
+    "sourceType": "pipeline_monitoring_policy_time_duration",
+    "templateGroupId": "38",
+    "templateId": "174"
+  },
+  {
+    "channel": "slack",
+    "file": "pipeline_monitoring_policy_time_end_time.json",
+    "sourceType": "pipeline_monitoring_policy_time_end_time",
+    "templateGroupId": "38",
+    "templateId": "171"
+  },
+  {
+    "channel": "slack",
+    "file": "pipeline_monitoring_policy_time_start_time.json",
+    "sourceType": "pipeline_monitoring_policy_time_start_time",
+    "templateGroupId": "38",
+    "templateId": "173"
+  },
+  {
+    "channel": "slack",
+    "file": "policy_execution.json",
+    "sourceType": "policy_execution",
+    "templateGroupId": "38",
+    "templateId": "169"
+  },
+  {
+    "channel": "slack",
+    "file": "profile.json",
+    "sourceType": "profile",
+    "templateGroupId": "38",
+    "templateId": "176"
+  },
+  {
+    "channel": "slack",
+    "file": "profile_anomaly_policy.json",
+    "sourceType": "profile_anomaly_policy",
+    "templateGroupId": "38",
+    "templateId": "168"
+  },
+  {
+    "channel": "slack",
+    "file": "reconciliation.json",
+    "sourceType": "reconciliation",
+    "templateGroupId": "38",
+    "templateId": "164"
+  },
+  {
+    "channel": "slack",
+    "file": "schema_drift.json",
+    "sourceType": "schema_drift",
+    "templateGroupId": "38",
+    "templateId": "166"
+  }
+]

@@ -8,7 +8,49 @@ The main script is:
 update_notification_templates.py
 ```
 
+There is also a policy-management helper:
+
+```bash
+manage_policies.py
+```
+
+It lists policies across an account and can update one policy or a filtered group of policies, including Data Quality and Data Freshness/Data Cadence policies.
+
 It works with ADOC notification template groups. A template group is the container, and each template inside the group is tied to a notification channel, such as Slack or Email, and a `sourceType`, such as `DATA_QUALITY`, `CRAWLER`, or `PROFILE`.
+
+## Table Of Contents
+
+Repo contents:
+
+- [README.md](README.md): this guide.
+- [update_notification_templates.py](update_notification_templates.py): export, create, update, and wire ADOC notification templates.
+- [manage_policies.py](manage_policies.py): list and update ADOC policies.
+- [dags/adoc_aruba_connectivity_smoke.py](dags/adoc_aruba_connectivity_smoke.py): Airflow DAG for Aruba ADOC connectivity validation.
+- [slack_templates/](slack_templates/): Slack notification template payloads by source type.
+- [email_templates/](email_templates/): Email notification template payloads by source type.
+
+Guide sections:
+
+- [What The Script Does](#what-the-script-does)
+- [Requirements](#requirements)
+- [Credentials](#credentials)
+- [Common Inputs](#common-inputs)
+- [List Policies](#list-policies)
+- [Update One Policy](#update-one-policy)
+- [Update A Group Of Policies](#update-a-group-of-policies)
+- [List Template Groups](#list-template-groups)
+- [Export Slack Templates](#export-slack-templates)
+- [Export Email Templates](#export-email-templates)
+- [Export From All Template Groups](#export-from-all-template-groups)
+- [Edit Templates](#edit-templates)
+- [Dry Run Before Updating](#dry-run-before-updating)
+- [Push All Templates](#push-all-templates)
+- [Push One Specific Template](#push-one-specific-template)
+- [Create Or Reuse A Template Group By Name](#create-or-reuse-a-template-group-by-name)
+- [Wire Notification Channel Groups](#wire-notification-channel-groups)
+- [Troubleshooting](#troubleshooting)
+- [Airflow ADOC Connectivity Smoke DAG](#airflow-adoc-connectivity-smoke-dag)
+- [Repository Safety](#repository-safety)
 
 ## What The Script Does
 
@@ -102,6 +144,96 @@ Optional identity headers can also be supplied with:
 export ADOC_USER_ID="<user-id>"
 export ADOC_USERNAME="<username>"
 ```
+
+## List Policies
+
+Use `manage_policies.py` to inventory policies in an account.
+
+```bash
+python3 manage_policies.py list \
+  --adoc-url <account-url> \
+  --api-key-file <api-key.csv> \
+  --policy-type all
+```
+
+List only Data Quality policies:
+
+```bash
+python3 manage_policies.py list \
+  --adoc-url <account-url> \
+  --api-key-file <api-key.csv> \
+  --policy-type data-quality
+```
+
+List only Data Freshness policies:
+
+```bash
+python3 manage_policies.py list \
+  --adoc-url <account-url> \
+  --api-key-file <api-key.csv> \
+  --policy-type data-freshness
+```
+
+If an environment routes catalog APIs under `/api`, add:
+
+```bash
+--api-prefix api
+```
+
+## Update One Policy
+
+Dry run first. This prints the mutating request without sending it.
+
+```bash
+python3 manage_policies.py update \
+  --adoc-url <account-url> \
+  --api-key-file <api-key.csv> \
+  --policy-type data-quality \
+  --policy-name Customer_DQ_Policy \
+  --payload-file policy_update.json \
+  --dry-run
+```
+
+Update by ID:
+
+```bash
+python3 manage_policies.py update \
+  --adoc-url <account-url> \
+  --api-key-file <api-key.csv> \
+  --policy-type data-freshness \
+  --policy-id 14718 \
+  --set-enabled false \
+  --dry-run
+```
+
+For Data Freshness, you can also resolve the policy from an asset ID:
+
+```bash
+python3 manage_policies.py update \
+  --adoc-url <account-url> \
+  --api-key-file <api-key.csv> \
+  --policy-type data-freshness \
+  --asset-id 1202692 \
+  --set-scheduled true \
+  --schedule "0 2 * * *" \
+  --dry-run
+```
+
+## Update A Group Of Policies
+
+Use `update-matching` with filters. Non-dry-run group updates require `--yes`.
+
+```bash
+python3 manage_policies.py update-matching \
+  --adoc-url <account-url> \
+  --api-key-file <api-key.csv> \
+  --policy-type data-quality \
+  --name-contains prod \
+  --payload-file policy_update.json \
+  --dry-run
+```
+
+Then run the same command without `--dry-run` and with `--yes` after reviewing the output.
 
 ## List Template Groups
 
@@ -314,6 +446,111 @@ If a template update returns HTTP 400, keep the default update payload style:
 This is the default because it matches the tested update behavior for the ADOC notification template endpoint.
 
 If only a few templates export, verify that the templates have content in ADOC for the selected channel. Empty or uninitialized templates may not return the same way as edited templates.
+
+## Airflow ADOC Connectivity Smoke DAG
+
+The repository includes an end-to-end Airflow DAG at:
+
+```bash
+dags/adoc_aruba_connectivity_smoke.py
+```
+
+Copy or sync this file into your Airflow `dags/` folder. The DAG expects the `acceldata-sdk` and `acceldata-airflow-sdk` packages to be installed in the Airflow environment.
+
+For Docker-based Airflow, install the packages in the Airflow containers used by the scheduler, webserver, and worker. If you only have `docker-compose.yml` and no Dockerfile, add `_PIP_ADDITIONAL_REQUIREMENTS` to the shared Airflow environment block.
+
+Many Airflow Compose files have an `x-airflow-common` section. Add the requirement there:
+
+```yaml
+x-airflow-common:
+  &airflow-common
+  environment:
+    &airflow-common-env
+    _PIP_ADDITIONAL_REQUIREMENTS: "acceldata-sdk acceldata-airflow-sdk"
+```
+
+If your file already has `_PIP_ADDITIONAL_REQUIREMENTS`, append the two packages to the existing value. Then recreate Airflow:
+
+```bash
+docker compose up -d
+```
+
+Verify the imports in the scheduler container:
+
+```bash
+docker compose exec airflow-scheduler python -c "import acceldata_airflow_sdk, acceldata_sdk; print('ok')"
+```
+
+If you run CeleryExecutor, verify the worker container too:
+
+```bash
+docker compose exec airflow-worker python -c "import acceldata_airflow_sdk, acceldata_sdk; print('ok')"
+```
+
+For a quick non-persistent test, you can install inside running containers instead, but this will be lost when containers are recreated:
+
+```bash
+docker compose exec airflow-scheduler pip install acceldata-sdk acceldata-airflow-sdk
+docker compose exec airflow-worker pip install acceldata-sdk acceldata-airflow-sdk
+docker compose exec airflow-webserver pip install acceldata-sdk acceldata-airflow-sdk
+```
+
+By default, the DAG uses an Airflow HTTP connection named:
+
+```text
+aruba_acceldata_connection
+```
+
+Configure that connection with:
+
+- `Host`: Aruba ADOC tenant URL, for example `https://<tenant-host>`
+- `Login`: ADOC access key
+- `Password`: ADOC secret key
+- `Extra`: optional JSON such as:
+
+```json
+{
+  "ADOC_TENANT_ID": "<tenant-id>",
+  "ENABLE_VERSION_CHECK": false,
+  "TORCH_CONNECTION_TIMEOUT_MS": 10000,
+  "TORCH_READ_TIMEOUT_MS": 20000
+}
+```
+
+The DAG has four tasks:
+
+```text
+validate_airflow_connection
+torch_pipeline_initializer
+validate_adoc_http_connection
+finalize_adoc_pipeline_success
+```
+
+`validate_airflow_connection` checks that the `aruba_acceldata_connection` connection is visible inside the Airflow task runtime before ADOC creates a pipeline run. `TorchInitializer` starts the ADOC pipeline run, the direct HTTP smoke-test task validates tenant connectivity, and `finalize_adoc_pipeline_success` explicitly ends the ADOC root span and marks the pipeline run `COMPLETED`. The DAG also has a failure callback that attempts to mark the ADOC pipeline run `FAILED` if a task fails after initialization.
+
+The smoke task intentionally does not use the SDK `@job` decorator because the decorator can fall back to `torch.acceldata.local` unless the SDK environment variables are also configured in every Airflow container.
+
+If you later add `@job`-decorated tasks, set these environment variables in Docker Compose as well:
+
+```text
+TORCH_CATALOG_URL
+TORCH_ACCESS_KEY
+TORCH_SECRET_KEY
+```
+
+You can override these DAG values with Airflow Variables or environment variables:
+
+```text
+ADOC_AIRFLOW_CONNECTION_ID
+ADOC_AIRFLOW_PIPELINE_UID
+ADOC_AIRFLOW_PIPELINE_NAME
+ADOC_AIRFLOW_PIPELINE_OWNER
+ADOC_AIRFLOW_PIPELINE_TEAM
+ADOC_AIRFLOW_CODE_LOCATION
+ADOC_AIRFLOW_SMOKE_PATHS
+```
+
+`ADOC_AIRFLOW_SMOKE_PATHS` is a comma-separated list of GET paths to try. The default tries both the direct and `/api`-prefixed catalog rules endpoint.
 
 ## Repository Safety
 

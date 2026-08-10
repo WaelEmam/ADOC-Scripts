@@ -2,7 +2,7 @@ import pathlib
 import tempfile
 import unittest
 
-from ADOC.adoc_bulk_onboard import (
+from adoc_bulk_onboard import (
     ADOCError,
     chunked,
     extract_list,

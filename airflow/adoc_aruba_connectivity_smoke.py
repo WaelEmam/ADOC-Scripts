@@ -52,7 +52,7 @@ PIPELINE_OWNER = setting("ADOC_AIRFLOW_PIPELINE_OWNER", "Wael Emam")
 PIPELINE_TEAM = setting("ADOC_AIRFLOW_PIPELINE_TEAM", "SE Team")
 CODE_LOCATION = setting(
     "ADOC_AIRFLOW_CODE_LOCATION",
-    "ADOC-Scripts/dags/adoc_aruba_connectivity_smoke.py",
+    "ADOC-Scripts/airflow/adoc_aruba_connectivity_smoke.py",
 )
 SMOKE_PATHS = setting(
     "ADOC_AIRFLOW_SMOKE_PATHS",

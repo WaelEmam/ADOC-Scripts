@@ -1,3 +1,7 @@
+# Disclaimer: 
+This repository is an independent, personal project. It is not owned, endorsed, or officially maintained by Acceldata. 
+Scripts here are provided as-is, with no warranty; use at your own risk against your own ADOC environments.
+
 # ADOC Scripts
 
 A collection of independent Python tools and an Airflow DAG for operating ADOC tenants:

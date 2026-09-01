@@ -34,12 +34,12 @@ These scripts provide a complete workflow for rotating secrets in Kubernetes and
 **Example:**
 ```bash
 # Dry-run to preview changes
-./rotate-secret-and-restart.sh --dry-run partnerusdcdpv2 global-storage globalstorage.json \
+./rotate-secret-and-restart.sh --dry-run <namespace> global-storage globalstorage.json \
   'MEASURE_RESULT_FS_S3A_ACCESS_KEY=AKIANEWACCESSKEY123' \
   'MEASURE_RESULT_FS_S3A_SECRET_KEY=newSecretKeyHere456'
 
 # Execute the rotation
-./rotate-secret-and-restart.sh partnerusdcdpv2 global-storage globalstorage.json \
+./rotate-secret-and-restart.sh <namespace> global-storage globalstorage.json \
   'MEASURE_RESULT_FS_S3A_ACCESS_KEY=AKIANEWACCESSKEY123' \
   'MEASURE_RESULT_FS_S3A_SECRET_KEY=newSecretKeyHere456'
 ```
@@ -77,36 +77,36 @@ These scripts provide a complete workflow for rotating secrets in Kubernetes and
 
 **Read a secret:**
 ```bash
-./update-k8s-secret.sh --read partnerusdcdpv2 global-storage globalstorage.json
+./update-k8s-secret.sh --read <namespace> global-storage globalstorage.json
 ```
 
 **List all keys in a secret:**
 ```bash
-./update-k8s-secret.sh --read partnerusdcdpv2 global-storage
+./update-k8s-secret.sh --read <namespace> global-storage
 ```
 
 **Merge specific fields:**
 ```bash
-./update-k8s-secret.sh --merge partnerusdcdpv2 global-storage globalstorage.json \
+./update-k8s-secret.sh --merge <namespace> global-storage globalstorage.json \
   'MEASURE_RESULT_FS_S3A_ACCESS_KEY=newkey' \
   'MEASURE_RESULT_FS_S3A_SECRET_KEY=newsecret'
 ```
 
 **Merge with dry-run:**
 ```bash
-./update-k8s-secret.sh --merge --dry-run partnerusdcdpv2 global-storage globalstorage.json \
+./update-k8s-secret.sh --merge --dry-run <namespace> global-storage globalstorage.json \
   'MEASURE_RESULT_FS_S3A_REGION=us-west-2'
 ```
 
 **Replace entire content:**
 ```bash
-./update-k8s-secret.sh --replace partnerusdcdpv2 global-storage globalstorage.json \
+./update-k8s-secret.sh --replace <namespace> global-storage globalstorage.json \
   '{"key":"value","another":"data"}'
 ```
 
 **Replace from file:**
 ```bash
-./update-k8s-secret.sh --replace partnerusdcdpv2 global-storage globalstorage.json \
+./update-k8s-secret.sh --replace <namespace> global-storage globalstorage.json \
   @/path/to/config.json
 ```
 
@@ -145,22 +145,22 @@ These scripts provide a complete workflow for rotating secrets in Kubernetes and
 
 **Dry-run to preview actions:**
 ```bash
-./restart-deployments.sh --dry-run partnerusdcdpv2
+./restart-deployments.sh --dry-run <namespace>
 ```
 
 **Execute the restart:**
 ```bash
-./restart-deployments.sh partnerusdcdpv2
+./restart-deployments.sh <namespace>
 ```
 
 **Skip waiting (fire and forget):**
 ```bash
-./restart-deployments.sh --skip-wait partnerusdcdpv2
+./restart-deployments.sh --skip-wait <namespace>
 ```
 
 **Custom timeout:**
 ```bash
-./restart-deployments.sh --wait-timeout 600 partnerusdcdpv2
+./restart-deployments.sh --wait-timeout 600 <namespace>
 ```
 
 ---
@@ -173,20 +173,20 @@ These scripts provide a complete workflow for rotating secrets in Kubernetes and
 
 ```bash
 # Step 1: Check current values
-./update-k8s-secret.sh --read partnerusdcdpv2 global-storage globalstorage.json
+./update-k8s-secret.sh --read <namespace> global-storage globalstorage.json
 
 # Step 2: Dry-run the rotation
-./rotate-secret-and-restart.sh --dry-run partnerusdcdpv2 global-storage globalstorage.json \
+./rotate-secret-and-restart.sh --dry-run <namespace> global-storage globalstorage.json \
   'MEASURE_RESULT_FS_S3A_ACCESS_KEY=AKIA...' \
   'MEASURE_RESULT_FS_S3A_SECRET_KEY=...'
 
 # Step 3: Execute the rotation
-./rotate-secret-and-restart.sh partnerusdcdpv2 global-storage globalstorage.json \
+./rotate-secret-and-restart.sh <namespace> global-storage globalstorage.json \
   'MEASURE_RESULT_FS_S3A_ACCESS_KEY=AKIA...' \
   'MEASURE_RESULT_FS_S3A_SECRET_KEY=...'
 
 # Step 4: Verify
-./update-k8s-secret.sh --read partnerusdcdpv2 global-storage globalstorage.json
+./update-k8s-secret.sh --read <namespace> global-storage globalstorage.json
 ```
 
 ### Workflow 2: Update Single Field
@@ -195,7 +195,7 @@ These scripts provide a complete workflow for rotating secrets in Kubernetes and
 
 ```bash
 # Update just the region
-./rotate-secret-and-restart.sh partnerusdcdpv2 global-storage globalstorage.json \
+./rotate-secret-and-restart.sh <namespace> global-storage globalstorage.json \
   'MEASURE_RESULT_FS_S3A_REGION=us-west-2'
 ```
 
@@ -205,14 +205,14 @@ These scripts provide a complete workflow for rotating secrets in Kubernetes and
 
 ```bash
 # 1. Update secret only (no restart)
-./update-k8s-secret.sh --merge partnerusdcdpv2 global-storage globalstorage.json \
+./update-k8s-secret.sh --merge <namespace> global-storage globalstorage.json \
   'MEASURE_RESULT_FS_S3A_ACCESS_KEY=newkey'
 
 # 2. Verify the update
-./update-k8s-secret.sh --read partnerusdcdpv2 global-storage globalstorage.json
+./update-k8s-secret.sh --read <namespace> global-storage globalstorage.json
 
 # 3. Manually restart deployments when ready
-./restart-deployments.sh partnerusdcdpv2
+./restart-deployments.sh <namespace>
 ```
 
 ### Workflow 4: Check Without Changes
@@ -221,7 +221,7 @@ These scripts provide a complete workflow for rotating secrets in Kubernetes and
 
 ```bash
 # Try to update with same values - script will detect no changes
-./rotate-secret-and-restart.sh partnerusdcdpv2 global-storage globalstorage.json \
+./rotate-secret-and-restart.sh <namespace> global-storage globalstorage.json \
   'MEASURE_RESULT_FS_S3A_ACCESS_KEY=currentvalue'
 
 # Output: "No changes detected - No update is necessary"
@@ -233,7 +233,7 @@ These scripts provide a complete workflow for rotating secrets in Kubernetes and
 
 ### Automatic Backups
 - Secrets are automatically backed up to `/tmp/` before any update
-- Backup filename format: `<secret-name>-backup-YYYYMMDD-HHMMSS.yaml`
+- Backup filename format: `<namespace>-<secret-name>-backup-YYYYMMDD-HHMMSS.yaml`
 - Use `kubectl apply -f /tmp/<backup-file>` to restore if needed
 
 ### Change Detection
@@ -380,12 +380,12 @@ rules:
 ### Example 1: Complete Rotation (Recommended)
 ```bash
 # One command does everything with safety checks
-./rotate-secret-and-restart.sh --dry-run partnerusdcdpv2 global-storage globalstorage.json \
+./rotate-secret-and-restart.sh --dry-run <namespace> global-storage globalstorage.json \
   'MEASURE_RESULT_FS_S3A_ACCESS_KEY=AKIANEWACCESSKEY' \
   'MEASURE_RESULT_FS_S3A_SECRET_KEY=newSecretKey'
 
 # If dry-run looks good, execute
-./rotate-secret-and-restart.sh partnerusdcdpv2 global-storage globalstorage.json \
+./rotate-secret-and-restart.sh <namespace> global-storage globalstorage.json \
   'MEASURE_RESULT_FS_S3A_ACCESS_KEY=AKIANEWACCESSKEY' \
   'MEASURE_RESULT_FS_S3A_SECRET_KEY=newSecretKey'
 ```
@@ -393,19 +393,19 @@ rules:
 ### Example 2: Read-Only Operations
 ```bash
 # See what's currently configured
-./update-k8s-secret.sh --read partnerusdcdpv2 global-storage globalstorage.json
+./update-k8s-secret.sh --read <namespace> global-storage globalstorage.json
 
 # List all secrets in namespace
-kubectl get secrets -n partnerusdcdpv2
+kubectl get secrets -n <namespace>
 
 # List all keys in a specific secret
-./update-k8s-secret.sh --read partnerusdcdpv2 global-storage
+./update-k8s-secret.sh --read <namespace> global-storage
 ```
 
 ### Example 3: Update Multiple Fields
 ```bash
 # Update bucket, region, and path in one command
-./rotate-secret-and-restart.sh partnerusdcdpv2 global-storage globalstorage.json \
+./rotate-secret-and-restart.sh <namespace> global-storage globalstorage.json \
   'MEASURE_RESULT_FS_S3A_BUCKET=new-bucket-name' \
   'MEASURE_RESULT_FS_S3A_REGION=eu-west-1' \
   'MEASURE_RESULT_FS_SAVE_PATH=new-path/'
@@ -414,11 +414,11 @@ kubectl get secrets -n partnerusdcdpv2
 ### Example 4: Update Secret Only (No Restart)
 ```bash
 # Update secret but restart deployments later
-./rotate-secret-and-restart.sh --skip-restart partnerusdcdpv2 global-storage globalstorage.json \
+./rotate-secret-and-restart.sh --skip-restart <namespace> global-storage globalstorage.json \
   'MEASURE_RESULT_FS_S3A_ACCESS_KEY=newkey'
 
 # Later, manually restart when ready
-./restart-deployments.sh partnerusdcdpv2
+./restart-deployments.sh <namespace>
 ```
 
 ---

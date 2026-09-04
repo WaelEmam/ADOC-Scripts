@@ -1,5 +1,30 @@
 #!/bin/bash
 
+################################################################################
+# Script: 1-update-vault.sh
+# Purpose: Update AWS credentials in OpenBao vault (requires write permissions)
+#
+# Workflow:
+#   1. Authenticate to OpenBao using AppRole (read-write credentials)
+#   2. Read existing secret to preserve non-credential fields
+#   3. Update AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
+#   4. Write updated secret back to OpenBao
+#   5. Verify the update was successful
+#
+# Key Functions:
+#   - Authenticates with BAO_ROLE_ID_RW/BAO_SECRET_ID_RW (write access)
+#   - Preserves other fields like AWS_REGION by default
+#   - Shows diff of changes before/after
+#   - Supports dry-run mode for safe preview
+#
+# Dependencies:
+#   - bao CLI (OpenBao command-line tool)
+#   - jq (JSON processor)
+#
+# Usage: ./1-update-vault.sh [OPTIONS] <openbao-secret-path> <access-key> <secret-key>
+################################################################################
+
+
 # Script to update AWS credentials in OpenBao vault
 # Usage: ./update-openbao-secret.sh [OPTIONS] <openbao-secret-path> <access-key> <secret-key>
 

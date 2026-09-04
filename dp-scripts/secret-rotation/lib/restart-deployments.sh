@@ -1,5 +1,33 @@
 #!/bin/bash
 
+################################################################################
+# Script: restart-deployments.sh
+# Purpose: Core library for Kubernetes deployment restart operations
+#
+# Capabilities:
+#   - Scale down deployments to 0 replicas
+#   - Wait for all pods to terminate
+#   - Scale up to target replica counts
+#   - Wait for all pods to be ready
+#   - Display final deployment status
+#
+# Configured Deployments:
+#   - acceldata-dataplane-analysis-service → 1 replica
+#   - acceldata-dataplane-analysis-standalone-service → 1 replica
+#   - sparkoperator → 1 replica
+#   - acceldata-dataplane-torch-monitor-service → 2 replicas
+#
+# Used By:
+#   - ../openbao/2-pull-to-k8s.sh (OpenBao workflow)
+#   - ../manual/rotate-and-restart.sh (Manual workflow)
+#
+# Dependencies:
+#   - kubectl (Kubernetes CLI)
+#
+# Usage: ./restart-deployments.sh [OPTIONS] <namespace>
+################################################################################
+
+
 # Script to scale down and up Kubernetes deployments (useful after secret rotation)
 # Usage: ./restart-deployments.sh [OPTIONS] <namespace>
 

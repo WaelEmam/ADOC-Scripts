@@ -1,5 +1,35 @@
 #!/bin/bash
 
+################################################################################
+# Script: update-k8s-secret.sh
+# Purpose: Core library for Kubernetes secret management operations
+#
+# Capabilities:
+#   - Read and display secret values (decoded from base64)
+#   - Merge specific fields into existing JSON secrets
+#   - Replace entire secret content
+#   - Detect if values match (avoids unnecessary updates)
+#   - Create automatic backups before updates
+#   - Verify updates after applying
+#
+# Modes:
+#   --read    : Display current secret value
+#   --merge   : Update specific fields (preserves others)
+#   --replace : Replace entire secret content
+#
+# Used By:
+#   - ../openbao/2-pull-to-k8s.sh (OpenBao workflow)
+#   - ../manual/rotate-and-restart.sh (Manual workflow)
+#
+# Dependencies:
+#   - kubectl (Kubernetes CLI)
+#   - jq (JSON processor)
+#   - base64 (encoding/decoding)
+#
+# Usage: ./update-k8s-secret.sh [OPTIONS] <namespace> <secret-name> <key-name> [data]
+################################################################################
+
+
 # Script to read, merge, or update a Kubernetes secret with base64-encoded values
 # Usage: ./update-k8s-secret.sh [OPTIONS] <namespace> <secret-name> <key-name> [data]
 

@@ -1,11 +1,32 @@
 #!/bin/bash
 
-# Script to fetch secrets from OpenBao and rotate them in Kubernetes
-# Usage: ./rotate-from-openbao.sh [OPTIONS] <namespace> <k8s-secret-name> <k8s-key-name> <openbao-secret-path>
+################################################################################
+# Script: 2-pull-to-k8s.sh
+# Purpose: Fetch AWS credentials from OpenBao vault and update Kubernetes secrets
+#
+# Workflow:
+#   1. Authenticate to OpenBao (read-only credentials)
+#   2. Fetch AWS ACCESS_KEY and SECRET_KEY from specified path
+#   3. Update Kubernetes secret using ../lib/update-k8s-secret.sh
+#   4. Restart deployments using ../lib/restart-deployments.sh
+#
+# Dependencies:
+#   - ../lib/update-k8s-secret.sh (for K8s secret updates)
+#   - ../lib/restart-deployments.sh (for deployment restarts)
+#   - bao CLI (OpenBao command-line tool)
+#   - kubectl (Kubernetes command-line tool)
+#   - jq (JSON processor)
+#
+# Usage: ./2-pull-to-k8s.sh [OPTIONS] <k8s-namespace> <k8s-secret-name> <k8s-key-name> <openbao-secret-path>
+################################################################################
 
 set -euo pipefail
 
-# Color codes for output
+# ============================================================================
+# GLOBAL VARIABLES AND COLOR CODES
+# ============================================================================
+
+# Color codes for formatted terminal output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -13,16 +34,19 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
-# Get script directory
+# Get script directory for relative path resolution
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Function to display usage
+# ============================================================================
+# FUNCTION: usage
+# Display help message with usage instructions and examples
+# ============================================================================
 usage() {
     echo "Usage: $0 [OPTIONS] <k8s-namespace> <k8s-secret-name> <k8s-key-name> <openbao-secret-path>"
     echo ""
     echo "Description:"
-    echo "  Fetches AWS credentials from OpenBao and updates Kubernetes secret."
-    echo "  Integrates with OpenBao for centralized secret management."
+    echo "  Fetches AWS credentials from OpenBao vault and updates Kubernetes secret."
+    echo "  Part of the OpenBao-integrated secret rotation workflow."
     echo ""
     echo "Options:"
     echo "  --dry-run              Preview all changes without applying them"
@@ -39,30 +63,36 @@ usage() {
     echo ""
     echo "Examples:"
     echo "  # Dry-run to preview changes"
-    echo "  export BAO_ADDR='https://bao-node-1.example.com:8200'"
-    echo "  export BAO_ROLE_ID_RO='your-read-only-role-id'"
-    echo "  export BAO_SECRET_ID_RO='your-read-only-secret-id'"
+    echo "  export BAO_ADDR='https://bao-node-1.acceldatasolutions.net:8200'"
+    echo "  export BAO_ROLE_ID_RO='read-only-role-id'"
+    echo "  export BAO_SECRET_ID_RO='read-only-secret-id'"
     echo ""
-    echo "  $0 --dry-run <namespace> global-storage globalstorage.json kv/aws/s3-credentials"
+    echo "  $0 --dry-run \\"
+    echo "    --access-key-field AWS_ACCESS_KEY_ID \\"
+    echo "    --secret-key-field AWS_SECRET_ACCESS_KEY \\"
+    echo "    fijiusdcdpv2 global-storage globalstorage.json aws-keys/poc/adoc/se-demo"
     echo ""
     echo "  # Execute the rotation"
-    echo "  $0 <namespace> global-storage globalstorage.json kv/aws/s3-credentials"
-    echo ""
-    echo "  # Custom field names"
-    echo "  $0 --access-key-field MEASURE_RESULT_FS_S3A_ACCESS_KEY \\"
-    echo "     --secret-key-field MEASURE_RESULT_FS_S3A_SECRET_KEY \\"
-    echo "     <namespace> global-storage globalstorage.json kv/aws/s3-credentials"
+    echo "  $0 \\"
+    echo "    --access-key-field AWS_ACCESS_KEY_ID \\"
+    echo "    --secret-key-field AWS_SECRET_ACCESS_KEY \\"
+    echo "    fijiusdcdpv2 global-storage globalstorage.json aws-keys/poc/adoc/se-demo"
     exit 1
 }
 
-# Default values
+# ============================================================================
+# PARSE COMMAND LINE OPTIONS
+# Process flags and extract arguments
+# ============================================================================
+
+# Default values for optional parameters
 DRY_RUN=false
 SKIP_RESTART=false
 SKIP_WAIT=false
 ACCESS_KEY_FIELD="access_key"
 SECRET_KEY_FIELD="secret_key"
 
-# Parse options
+# Parse optional flags
 while [[ $# -gt 0 ]]; do
     case $1 in
         --dry-run)
@@ -94,20 +124,24 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Remaining arguments
+# Extract positional arguments
 K8S_NAMESPACE=${1:-}
 K8S_SECRET_NAME=${2:-}
 K8S_KEY_NAME=${3:-}
 OPENBAO_SECRET_PATH=${4:-}
 
-# Validate arguments
+# ============================================================================
+# VALIDATION: Required Arguments
+# ============================================================================
 if [ -z "$K8S_NAMESPACE" ] || [ -z "$K8S_SECRET_NAME" ] || [ -z "$K8S_KEY_NAME" ] || [ -z "$OPENBAO_SECRET_PATH" ]; then
     echo -e "${RED}Error: Missing required arguments${NC}"
     echo ""
     usage
 fi
 
-# Check required environment variables
+# ============================================================================
+# VALIDATION: Required Environment Variables
+# ============================================================================
 if [ -z "$BAO_ADDR" ]; then
     echo -e "${RED}Error: BAO_ADDR environment variable is not set${NC}"
     echo "Set it to your OpenBao server address, e.g.:"
@@ -127,7 +161,10 @@ if [ -z "$BAO_SECRET_ID_RO" ]; then
     exit 1
 fi
 
-# Check if required tools are available
+# ============================================================================
+# VALIDATION: Required Tools
+# Check for required command-line tools
+# ============================================================================
 if ! command -v bao &> /dev/null; then
     echo -e "${RED}Error: 'bao' CLI is not installed or not in PATH${NC}"
     echo ""
@@ -141,13 +178,27 @@ if ! command -v jq &> /dev/null; then
     exit 1
 fi
 
-# Check if rotation script exists
-ROTATION_SCRIPT="$SCRIPT_DIR/rotate-secret-and-restart.sh"
-if [ ! -f "$ROTATION_SCRIPT" ]; then
-    echo -e "${RED}Error: rotate-secret-and-restart.sh not found in $SCRIPT_DIR${NC}"
+# ============================================================================
+# VALIDATION: Dependent Scripts
+# Ensure required lib scripts exist
+# ============================================================================
+UPDATE_SCRIPT="$SCRIPT_DIR/../lib/update-k8s-secret.sh"
+RESTART_SCRIPT="$SCRIPT_DIR/../lib/restart-deployments.sh"
+
+if [ ! -f "$UPDATE_SCRIPT" ]; then
+    echo -e "${RED}Error: update-k8s-secret.sh not found at $UPDATE_SCRIPT${NC}"
     exit 1
 fi
 
+if [ ! -f "$RESTART_SCRIPT" ]; then
+    echo -e "${RED}Error: restart-deployments.sh not found at $RESTART_SCRIPT${NC}"
+    exit 1
+fi
+
+# ============================================================================
+# DISPLAY CONFIGURATION
+# Show user what will be done
+# ============================================================================
 echo -e "${CYAN}======================================================================${NC}"
 echo -e "${CYAN}OpenBao to Kubernetes Secret Rotation${NC}"
 echo -e "${CYAN}======================================================================${NC}"
@@ -166,6 +217,7 @@ echo ""
 
 # ============================================================================
 # STEP 1: Authenticate to OpenBao
+# Use read-only AppRole credentials to get a token
 # ============================================================================
 echo -e "${BLUE}======================================================================${NC}"
 echo -e "${BLUE}Step 1: Authenticate to OpenBao${NC}"
@@ -190,11 +242,12 @@ export BAO_TOKEN
 echo -e "${GREEN}✓ Successfully authenticated to OpenBao${NC}"
 echo ""
 
-# Setup token cleanup on exit
+# Setup token cleanup on exit - ensures token is revoked even if script fails
 trap 'bao token revoke -self >/dev/null 2>&1 || true; rm -f /tmp/bao-*.tmp' EXIT
 
 # ============================================================================
-# STEP 2: Fetch secrets from OpenBao
+# STEP 2: Fetch AWS Credentials from OpenBao
+# Retrieve access key and secret key from vault
 # ============================================================================
 echo -e "${BLUE}======================================================================${NC}"
 echo -e "${BLUE}Step 2: Fetch AWS Credentials from OpenBao${NC}"
@@ -213,12 +266,13 @@ if ! SECRET_JSON=$(bao kv get -format=json "$OPENBAO_SECRET_PATH" 2>/tmp/bao-rea
     exit 1
 fi
 
-# Parse the secret data (handle KV v2 envelope)
-# KV v2 structure: .data.data.<field>
-# KV v1 structure: .data.<field>
+# Parse the secret data (handles both KV v1 and KV v2 formats)
+# KV v2: .data.data.<field>
+# KV v1: .data.<field>
 ACCESS_KEY=$(echo "$SECRET_JSON" | jq -r ".data.data.${ACCESS_KEY_FIELD} // .data.${ACCESS_KEY_FIELD} // empty")
 SECRET_KEY=$(echo "$SECRET_JSON" | jq -r ".data.data.${SECRET_KEY_FIELD} // .data.${SECRET_KEY_FIELD} // empty")
 
+# Validate that we successfully extracted the keys
 if [ -z "$ACCESS_KEY" ] || [ "$ACCESS_KEY" == "null" ]; then
     echo -e "${RED}✗ Failed to extract access key from OpenBao secret${NC}"
     echo ""
@@ -246,25 +300,21 @@ echo ""
 
 # ============================================================================
 # STEP 3: Update Kubernetes Secret
+# Call lib/update-k8s-secret.sh with the fetched credentials
 # ============================================================================
 echo -e "${BLUE}======================================================================${NC}"
-echo -e "${BLUE}Step 3: Update Kubernetes Secret and Restart Deployments${NC}"
+echo -e "${BLUE}Step 3: Update Kubernetes Secret${NC}"
 echo -e "${BLUE}======================================================================${NC}"
 echo ""
 
-# Build arguments for the rotation script
-ROTATION_ARGS=()
+# Build arguments for the update script
+UPDATE_ARGS=()
 if [ "$DRY_RUN" == true ]; then
-    ROTATION_ARGS+=("--dry-run")
-fi
-if [ "$SKIP_RESTART" == true ]; then
-    ROTATION_ARGS+=("--skip-restart")
-fi
-if [ "$SKIP_WAIT" == true ]; then
-    ROTATION_ARGS+=("--skip-wait")
+    UPDATE_ARGS+=("--dry-run")
 fi
 
-ROTATION_ARGS+=(
+UPDATE_ARGS+=(
+    "--merge"
     "$K8S_NAMESPACE"
     "$K8S_SECRET_NAME"
     "$K8S_KEY_NAME"
@@ -272,31 +322,68 @@ ROTATION_ARGS+=(
     "MEASURE_RESULT_FS_S3A_SECRET_KEY=${SECRET_KEY}"
 )
 
-# Execute the rotation
-"$ROTATION_SCRIPT" "${ROTATION_ARGS[@]}"
+# Execute the Kubernetes secret update
+echo -e "${YELLOW}Calling ../lib/update-k8s-secret.sh...${NC}"
+"$UPDATE_SCRIPT" "${UPDATE_ARGS[@]}"
 
-ROTATION_EXIT_CODE=$?
+UPDATE_EXIT_CODE=$?
+
+if [ $UPDATE_EXIT_CODE -ne 0 ]; then
+    echo -e "${RED}✗ Failed to update Kubernetes secret${NC}"
+    exit $UPDATE_EXIT_CODE
+fi
+
+echo ""
+
+# ============================================================================
+# STEP 4: Restart Deployments (if not skipped)
+# Call lib/restart-deployments.sh to cycle pods with new secrets
+# ============================================================================
+if [ "$SKIP_RESTART" == false ] && [ "$DRY_RUN" == false ]; then
+    echo -e "${BLUE}======================================================================${NC}"
+    echo -e "${BLUE}Step 4: Restart Deployments${NC}"
+    echo -e "${BLUE}======================================================================${NC}"
+    echo ""
+
+    # Build arguments for the restart script
+    RESTART_ARGS=()
+    if [ "$SKIP_WAIT" == true ]; then
+        RESTART_ARGS+=("--skip-wait")
+    fi
+    RESTART_ARGS+=("$K8S_NAMESPACE")
+
+    # Execute the deployment restart
+    echo -e "${YELLOW}Calling ../lib/restart-deployments.sh...${NC}"
+    "$RESTART_SCRIPT" "${RESTART_ARGS[@]}"
+
+    RESTART_EXIT_CODE=$?
+
+    if [ $RESTART_EXIT_CODE -ne 0 ]; then
+        echo -e "${RED}✗ Failed to restart deployments${NC}"
+        exit $RESTART_EXIT_CODE
+    fi
+
+    echo ""
+elif [ "$SKIP_RESTART" == true ]; then
+    echo -e "${YELLOW}Skipping deployment restart (--skip-restart flag)${NC}"
+    echo ""
+fi
 
 # ============================================================================
 # SUMMARY
+# Display final status and next steps
 # ============================================================================
-echo ""
 echo -e "${GREEN}======================================================================${NC}"
 if [ "$DRY_RUN" == true ]; then
     echo -e "${GREEN}Dry-run completed - No changes were made${NC}"
     echo -e "${GREEN}Remove --dry-run flag to execute${NC}"
 else
-    if [ $ROTATION_EXIT_CODE -eq 0 ]; then
-        echo -e "${GREEN}✓ Secret rotation completed successfully!${NC}"
-    else
-        echo -e "${RED}✗ Secret rotation failed${NC}"
-        exit $ROTATION_EXIT_CODE
-    fi
+    echo -e "${GREEN}✓ Secret rotation completed successfully!${NC}"
 fi
 echo -e "${GREEN}======================================================================${NC}"
 echo ""
 
-if [ "$DRY_RUN" == false ] && [ $ROTATION_EXIT_CODE -eq 0 ]; then
+if [ "$DRY_RUN" == false ]; then
     echo "Summary:"
     echo "  ✓ Retrieved credentials from OpenBao ($OPENBAO_SECRET_PATH)"
     echo "  ✓ Updated Kubernetes secret '$K8S_SECRET_NAME' in namespace '$K8S_NAMESPACE'"

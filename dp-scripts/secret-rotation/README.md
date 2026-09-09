@@ -10,8 +10,22 @@ These scripts provide a complete workflow for rotating secrets in Kubernetes and
 
 ## Which Workflow Should I Use?
 
-### **Use OpenBao Workflow** ✅ (Recommended)
-**When:** Your FE team manages secrets in OpenBao vault
+### **Complete Automation** 🚀 (Most Advanced)
+**When:** You have AWS IAM permissions to rotate keys AND OpenBao access
+
+**Benefits:**
+- ✅ Fully hands-off end-to-end rotation
+- ✅ Rotates in AWS → OpenBao → K8s automatically
+- ✅ Optional old key cleanup
+- ✅ Perfect for scheduled/automated rotation
+
+**Script to use:**
+- `openbao/0-rotate-aws-and-sync.sh` - Complete AWS → OpenBao → K8s workflow
+
+---
+
+### **OpenBao Workflow** ✅ (Recommended for manual rotation)
+**When:** Your FE team manages secrets in OpenBao vault OR you already have new AWS keys
 
 **Benefits:**
 - ✅ Single source of truth for credentials
@@ -26,7 +40,7 @@ These scripts provide a complete workflow for rotating secrets in Kubernetes and
 
 ---
 
-### **Use Manual Workflow**
+### **Manual Workflow**
 **When:** You don't have OpenBao access OR need to manually enter credentials
 
 **Scripts to use:**
@@ -39,23 +53,35 @@ These scripts provide a complete workflow for rotating secrets in Kubernetes and
 ### Directory Structure
 ```
 secret-rotation/
-├── openbao/                  # OpenBao workflow scripts
-│   ├── 1-update-vault.sh    # Update credentials in OpenBao vault
-│   └── 2-update-k8s-secrets.sh     # Fetch from OpenBao → update K8s
+├── openbao/                        # OpenBao workflow scripts
+│   ├── 0-rotate-aws-and-sync.sh   # 🚀 Complete automation (AWS → OpenBao → K8s)
+│   ├── 1-update-vault.sh          # Update credentials in OpenBao vault
+│   └── 2-update-k8s-secrets.sh    # Fetch from OpenBao → update K8s
 │
-├── manual/                   # Manual workflow scripts
-│   └── rotate-and-restart.sh # Manual credential entry workflow
+├── manual/                         # Manual workflow scripts
+│   └── rotate-and-restart.sh      # Manual credential entry workflow
 │
-├── lib/                      # Shared library scripts
-│   ├── update-k8s-secret.sh  # Core K8s secret operations
-│   └── restart-deployments.sh # Core K8s deployment restart
+├── lib/                            # Shared library scripts
+│   ├── update-k8s-secret.sh       # Core K8s secret operations
+│   └── restart-deployments.sh     # Core K8s deployment restart
 │
-└── README.md                 # This file
+└── README.md                       # This file
 ```
 
 ### Script Relationships
 
-**OpenBao Workflow (Automated):**
+**Complete Automation (AWS → OpenBao → K8s):**
+```
+openbao/0-rotate-aws-and-sync.sh 🚀
+  ├─> AWS IAM (create new access key)
+  ├─> openbao/1-update-vault.sh (store in vault)
+  ├─> openbao/2-update-k8s-secrets.sh (propagate to K8s)
+  │   ├─> lib/update-k8s-secret.sh
+  │   └─> lib/restart-deployments.sh
+  └─> AWS IAM (delete old key, optional)
+```
+
+**OpenBao Workflow (Semi-Automated):**
 ```
 openbao/2-update-k8s-secrets.sh
   ├─> OpenBao vault (fetch credentials)
@@ -80,6 +106,76 @@ manual/rotate-and-restart.sh
 ---
 
 ## Scripts
+
+### 0. `openbao/0-rotate-aws-and-sync.sh` (Complete Automation) 🚀
+
+**Purpose:** End-to-end AWS credential rotation - the fully automated workflow.
+
+**What it does:**
+1. Creates new AWS IAM access key for specified user
+2. Updates OpenBao vault with new credentials (calls `1-update-vault.sh`)
+3. Updates Kubernetes secrets from OpenBao (calls `2-update-k8s-secrets.sh`)
+4. (Optional) Deletes old AWS access key after successful propagation
+
+**Usage:**
+```bash
+./openbao/0-rotate-aws-and-sync.sh [OPTIONS] <aws-username> <openbao-secret-path> <k8s-namespace> <k8s-secret-name> <k8s-key-name>
+```
+
+**Options:**
+- `--dry-run` - Preview changes without applying them
+- `--delete-old-key` - Delete old AWS access key after successful rotation
+- `--aws-profile` - AWS CLI profile to use (default: default)
+- `--skip-k8s` - Update OpenBao only, skip K8s update
+- `-h, --help` - Show help message
+
+**Required Environment Variables:**
+```bash
+# AWS credentials (for IAM operations)
+export AWS_ACCESS_KEY_ID='your-aws-admin-key'
+export AWS_SECRET_ACCESS_KEY='your-aws-admin-secret'
+# OR use AWS CLI profile with --aws-profile flag
+
+# OpenBao credentials (write access for vault update)
+export BAO_ADDR='https://bao-node-1.acceldatasolutions.net:8200'
+export BAO_ROLE_ID_RW='your-write-role-id'
+export BAO_SECRET_ID_RW='your-write-secret-id'
+
+# OpenBao credentials (read access for K8s update)
+export BAO_ROLE_ID_RO='your-read-role-id'
+export BAO_SECRET_ID_RO='your-read-secret-id'
+```
+
+**Example:**
+```bash
+# Dry-run to preview the full workflow
+./openbao/0-rotate-aws-and-sync.sh --dry-run \
+  se-demo-user \
+  aws-keys/poc/adoc/se-demo \
+  fijiusdcdpv2 global-storage globalstorage.json
+
+# Execute full rotation and delete old key
+./openbao/0-rotate-aws-and-sync.sh --delete-old-key \
+  se-demo-user \
+  aws-keys/poc/adoc/se-demo \
+  fijiusdcdpv2 global-storage globalstorage.json
+
+# Rotate AWS and update OpenBao only (skip K8s)
+./openbao/0-rotate-aws-and-sync.sh --skip-k8s \
+  se-demo-user \
+  aws-keys/poc/adoc/se-demo \
+  fijiusdcdpv2 global-storage globalstorage.json
+```
+
+**Prerequisites:**
+- AWS CLI (`aws`) installed with IAM permissions to create/delete access keys
+- OpenBao CLI (`bao`) installed
+- AppRole credentials with both **read** and **write** permissions
+- kubectl configured for target cluster
+
+**Use this when:** You have AWS IAM permissions and want complete hands-off automation.
+
+---
 
 ### 1. `openbao/1-update-vault.sh` (OpenBao Write)
 
